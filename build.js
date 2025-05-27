@@ -1,8 +1,15 @@
 const esbuild = require('esbuild');
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 const isWatch = process.argv.includes('--watch');
+
+// Build Tailwind CSS
+const buildTailwind = () => {
+  console.log('Building Tailwind CSS...');
+  execSync('npx tailwindcss -i ./src/tailwind.css -o ./dist/tailwind.css --minify', { stdio: 'inherit' });
+};
 
 // Copy static files
 const copyStaticFiles = () => {
@@ -62,6 +69,7 @@ const buildOptions = {
 
 // Initial build
 copyStaticFiles();
+buildTailwind();
 
 if (isWatch) {
   // Watch mode
