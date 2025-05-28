@@ -1,13 +1,13 @@
 export interface TranslationRequest {
   text: string;
-  sourceLang: 'ja' | 'en' | 'auto';
-  targetLang: 'ja' | 'en';
+  sourceLang: 'ja' | 'en' | 'zh' | 'ko' | 'auto';
+  targetLang: 'ja' | 'en' | 'zh' | 'ko';
   context?: string;
 }
 
 export interface TranslationResponse {
   translatedText: string;
-  detectedLanguage?: 'ja' | 'en';
+  detectedLanguage?: 'ja' | 'en' | 'zh' | 'ko';
 }
 
 export class ClaudeTranslator {
@@ -37,7 +37,7 @@ export class ClaudeTranslator {
     }
   }
 
-  async batchTranslate(texts: string[], sourceLang: 'ja' | 'en' | 'auto', targetLang: 'ja' | 'en'): Promise<string[]> {
+  async batchTranslate(texts: string[], sourceLang: 'ja' | 'en' | 'zh' | 'ko' | 'auto', targetLang: 'ja' | 'en' | 'zh' | 'ko'): Promise<string[]> {
     const maxTokensPerBatch = 3000;
     const batches: string[][] = [];
     let currentBatch: string[] = [];
@@ -68,7 +68,7 @@ export class ClaudeTranslator {
     return results;
   }
 
-  private async translateBatch(texts: string[], sourceLang: 'ja' | 'en' | 'auto', targetLang: 'ja' | 'en'): Promise<string[]> {
+  private async translateBatch(texts: string[], sourceLang: 'ja' | 'en' | 'zh' | 'ko' | 'auto', targetLang: 'ja' | 'en' | 'zh' | 'ko'): Promise<string[]> {
     const numberedTexts = texts.map((text, i) => `[${i + 1}] ${text}`).join('\n\n');
     const prompt = `You are a professional Japanese-English translator. Translate the following numbered texts while preserving their meaning, tone, and formatting.
 

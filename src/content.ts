@@ -236,28 +236,60 @@ class ContentScript {
     const translatedText = this.translationPopup!.querySelector(".translated-text") as HTMLElement;
     const loadingSpinner = this.translationPopup!.querySelector(".loading-spinner") as HTMLElement;
 
+    // Null checks for DOM elements
+    if (!sourceText || !translatedText || !loadingSpinner) {
+      console.error('[ContentScript] Translation popup elements not found:', {
+        sourceText: !!sourceText,
+        translatedText: !!translatedText,
+        loadingSpinner: !!loadingSpinner
+      });
+      return;
+    }
+
     sourceText.textContent = this.selectedText;
     translatedText.textContent = "";
     loadingSpinner.style.display = "block";
 
     try {
+      console.log("[ContentScript] 選択テキスト翻訳開始:", this.selectedText);
+      
       const detectedLang = this.languageDetector.detect(this.selectedText);
       const targetLang = this.languageDetector.getTargetLanguage(this.selectedText);
+      
+      console.log("[ContentScript] 言語検出結果:", { detectedLang, targetLang });
 
       this.updateLanguageLabels(detectedLang, targetLang);
+
+      // サポートされている言語に変換（中国語・韓国語は日本語に翻訳）
+      let finalTargetLang: "ja" | "en" | "zh" | "ko" = "ja";
+      if (targetLang === "ja" || targetLang === "en") {
+        finalTargetLang = targetLang;
+      } else if (targetLang === "zh" || targetLang === "ko") {
+        finalTargetLang = "ja"; // 中国語・韓国語は日本語に翻訳
+      }
+
+      console.log("[ContentScript] 翻訳開始:", { sourceLang: "auto", targetLang: finalTargetLang });
 
       const result = await this.translator.translate({
         text: this.selectedText,
         sourceLang: "auto",
-        targetLang: targetLang as "ja" | "en",
+        targetLang: finalTargetLang,
       });
 
-      translatedText.textContent = result.translatedText;
+      console.log("[ContentScript] 翻訳完了:", result.translatedText);
+      if (translatedText) {
+        translatedText.textContent = result.translatedText;
+      }
     } catch (error) {
-      translatedText.textContent = "エラー: 翻訳に失敗しました";
-      console.error("Translation error:", error);
+      const errorMessage = error instanceof Error ? error.message : "翻訳に失敗しました";
+      if (translatedText) {
+        translatedText.textContent = `エラー: ${errorMessage}`;
+      }
+      console.error("[ContentScript] Translation error:", error);
     } finally {
-      loadingSpinner.style.display = "none";
+      if (loadingSpinner) {
+        loadingSpinner.style.display = "none";
+      }
     }
   }
 
@@ -288,11 +320,16 @@ class ContentScript {
   }
 
   private updateLanguageLabels(sourceLang: string, targetLang: string) {
-    const sourceLangLabel = this.translationPopup!.querySelector("#source-lang") as HTMLElement;
-    const targetLangLabel = this.translationPopup!.querySelector("#target-lang") as HTMLElement;
+    const sourceSelect = this.translationPopup!.querySelector("#source-lang-select") as HTMLSelectElement;
+    const targetSelect = this.translationPopup!.querySelector("#target-lang-select") as HTMLSelectElement;
 
-    sourceLangLabel.textContent = this.languageDetector.getLanguageDisplayName(sourceLang as any);
-    targetLangLabel.textContent = this.languageDetector.getLanguageDisplayName(targetLang as any);
+    if (sourceSelect && targetSelect) {
+      // Set the select values to reflect detected languages
+      if (sourceLang !== "auto" && sourceLang !== "unknown" && sourceLang !== "mixed") {
+        sourceSelect.value = sourceLang;
+      }
+      targetSelect.value = targetLang;
+    }
   }
 
   private swapLanguages() {

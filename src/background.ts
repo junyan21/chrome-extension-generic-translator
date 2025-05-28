@@ -91,7 +91,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   
   // Handle translation API calls
   if (request.action === 'translate') {
-    console.log('Background: Received translation request');
+    console.log('Background: Received translation request, prompt length:', request.prompt?.length);
     (async () => {
       try {
         // Get API key from storage
@@ -99,16 +99,19 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         console.log('Background: API key exists:', !!result.apiKey);
         
         if (!result.apiKey) {
-          sendResponse({ error: 'API key not set' });
+          console.error('Background: API key not found in storage');
+          sendResponse({ error: 'APIキーが設定されていません。拡張機能の設定画面でAPIキーを入力してください。' });
           return;
         }
         
+        console.log('Background: Making API call...');
         const translatedText = await callClaudeAPI(request.prompt, result.apiKey);
-        console.log('Background: Sending translation response');
+        console.log('Background: API call successful, response length:', translatedText?.length);
         sendResponse({ success: true, translatedText });
       } catch (error) {
         console.error('Background: Translation error:', error);
-        sendResponse({ error: error instanceof Error ? error.message : 'Unknown error' });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        sendResponse({ error: `翻訳エラー: ${errorMessage}` });
       }
     })();
     return true; // Will respond asynchronously

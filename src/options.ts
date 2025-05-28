@@ -85,6 +85,10 @@ class OptionsPage {
     // Clear cache button
     const clearCacheButton = document.getElementById('clear-cache');
     clearCacheButton?.addEventListener('click', () => this.clearCache());
+    
+    // Test API key button
+    const testApiButton = document.getElementById('test-api-key');
+    testApiButton?.addEventListener('click', () => this.testApiKey());
 
     // API key input - show status when changed
     const apiKeyInput = document.getElementById('api-key') as HTMLInputElement;
@@ -148,6 +152,53 @@ class OptionsPage {
       chrome.runtime.sendMessage({ action: 'clearCache' }, (response) => {
         alert('キャッシュがクリアされました');
       });
+    }
+  }
+  
+  private async testApiKey() {
+    const apiKeyInput = document.getElementById('api-key') as HTMLInputElement;
+    const apiKey = apiKeyInput.value.trim();
+    
+    if (!apiKey) {
+      alert('APIキーを入力してください');
+      return;
+    }
+    
+    const testButton = document.getElementById('test-api-key') as HTMLButtonElement;
+    const originalText = testButton.textContent;
+    testButton.textContent = 'テスト中...';
+    testButton.disabled = true;
+    
+    try {
+      // テスト用の簡単な翻訳を実行
+      const testPrompt = `You are a professional Japanese-English translator. Translate the following text while preserving its meaning, tone, and formatting.
+
+Source language: auto
+Target language: ja
+
+Rules:
+- Maintain natural fluency in the target language
+- Return ONLY the translation without explanations
+
+Text to translate:
+Hello`;
+
+      const response = await chrome.runtime.sendMessage({
+        action: 'translate',
+        prompt: testPrompt
+      });
+      
+      if (response.error) {
+        throw new Error(response.error);
+      }
+      
+      alert(`APIキーテスト成功！\n翻訳結果: ${response.translatedText}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`APIキーテストに失敗しました:\n${errorMessage}`);
+    } finally {
+      testButton.textContent = originalText;
+      testButton.disabled = false;
     }
   }
 }
