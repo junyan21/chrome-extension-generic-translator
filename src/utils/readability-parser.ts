@@ -243,14 +243,25 @@ export class FullPageTranslator {
       if (!hasTranslatableChildren && this.shouldTranslateElement(htmlElement)) {
         const text = this.getDirectTextContent(htmlElement);
         if (text.length > 1) {
-          // 1文字以上のテキストのみ
-          blocks.push({
-            element: htmlElement,
-            originalText: text,
-            isTranslated: false,
-            priority: this.calculatePriority(htmlElement),
-          });
-          visibleCount++;
+          // 翻訳対象として追加する前に最終チェック
+          const computedStyle = window.getComputedStyle(htmlElement);
+          const isCurrentlyVisible = this.isElementVisible(htmlElement);
+          
+          console.log(`[FullPageTranslator] 翻訳対象候補: ${htmlElement.tagName} display="${computedStyle.display}" visible=${isCurrentlyVisible} text="${text.substring(0, 30)}..."`);
+          
+          if (computedStyle.display === "none" || !isCurrentlyVisible) {
+            console.log(`[FullPageTranslator] 非表示のため除外: ${htmlElement.tagName}`);
+            hiddenCount++;
+          } else {
+            // 1文字以上のテキストのみ
+            blocks.push({
+              element: htmlElement,
+              originalText: text,
+              isTranslated: false,
+              priority: this.calculatePriority(htmlElement),
+            });
+            visibleCount++;
+          }
         }
       } else if (!this.isElementVisible(htmlElement)) {
         hiddenCount++;
@@ -406,7 +417,11 @@ export class FullPageTranslator {
 
     // 翻訳時点で要素が非表示の場合はスキップ
     if (computedStyle.display === "none" || !this.isElementVisible(block.element)) {
-      console.log(`[FullPageTranslator] 要素が非表示のため翻訳をスキップ: ${block.element.tagName} - "${block.originalText.substring(0, 50)}..."`);
+      console.log(
+        `[FullPageTranslator] 要素が非表示のため翻訳をスキップ: ${
+          block.element.tagName
+        } - "${block.originalText.substring(0, 50)}..."`
+      );
       return;
     }
 
@@ -1180,14 +1195,14 @@ ${text}`;
       const translatedElement = element.nextElementSibling as HTMLElement;
       if (translatedElement?.classList.contains("dl-translated-text")) {
         const originalDisplay = element.getAttribute("data-original-display") || "";
-        
+
         console.log(`[FullPageTranslator] 要素切り替え:`, {
           elementTagName: element.tagName,
           originalText: originalText.substring(0, 50) + "...",
           originalDisplay: originalDisplay,
           currentElementDisplay: element.style.display,
           currentTranslatedDisplay: translatedElement.style.display,
-          isTranslated: this.translationState.isTranslated
+          isTranslated: this.translationState.isTranslated,
         });
 
         if (this.translationState.isTranslated) {
@@ -1197,7 +1212,22 @@ ${text}`;
           if (originalDisplay === "none" || originalDisplay === "") {
             // 要素タイプに応じたデフォルト表示値を設定
             const tagName = element.tagName.toLowerCase();
-            if (["div", "p", "h1", "h2", "h3", "h4", "h5", "h6", "section", "article", "header", "footer"].includes(tagName)) {
+            if (
+              [
+                "div",
+                "p",
+                "h1",
+                "h2",
+                "h3",
+                "h4",
+                "h5",
+                "h6",
+                "section",
+                "article",
+                "header",
+                "footer",
+              ].includes(tagName)
+            ) {
               displayValue = "block";
             } else if (["span", "a", "strong", "em", "code"].includes(tagName)) {
               displayValue = "inline";
@@ -1209,11 +1239,13 @@ ${text}`;
           element.style.visibility = "";
           element.style.opacity = "";
           translatedElement.style.display = "none";
-          console.log(`[FullPageTranslator] 原文表示: ${element.tagName} display="${displayValue}" (original: "${originalDisplay}")`);
+          console.log(
+            `[FullPageTranslator] 原文表示: ${element.tagName} display="${displayValue}" (original: "${originalDisplay}")`
+          );
         } else {
           // 原文→翻訳文に切り替え
           element.style.display = "none";
-          translatedElement.style.display = originalDisplay === "none" ? "" : (originalDisplay || "");
+          translatedElement.style.display = originalDisplay === "none" ? "" : originalDisplay || "";
           console.log(`[FullPageTranslator] 翻訳表示: ${element.tagName}`);
         }
         toggledCount++;
@@ -1605,17 +1637,58 @@ ${text}`;
       this.viewportObserver.disconnect();
     }
 
-    this.translationState.originalElements.forEach((_, element) => {
-      const translatedElement = element.nextElementSibling;
-      if (translatedElement?.classList.contains("dl-translated-text")) {
-        translatedElement.remove();
+    // 1. まず、DOM上の全ての翻訳要素を検索して削除
+    const allTranslatedElements = document.querySelectorAll(".dl-translated-text");
+    console.log(`[FullPageTranslator] ${allTranslatedElements.length}個の翻訳要素を削除`);
+    
+    allTranslatedElements.forEach((translatedElement) => {
+      // 翻訳要素から元のテキストを復元
+      const originalText = translatedElement.getAttribute("data-dl-original-text");
+      if (originalText) {
+        try {
+          const decodedText = atob(originalText);
+          translatedElement.textContent = decodedText;
+          console.log(`[FullPageTranslator] 元のテキストを復元: "${decodedText.substring(0, 30)}..."`);
+        } catch (error) {
+          console.error("[FullPageTranslator] テキストの復元に失敗:", error);
+        }
       }
+      
+      // 翻訳要素のクラスと属性を削除
+      translatedElement.classList.remove("dl-translated-text");
+      
+      // 元の表示状態に完全に戻す
+      const originalDisplay = translatedElement.getAttribute("data-original-display");
+      if (originalDisplay !== null) {
+        translatedElement.setAttribute("style", `display: ${originalDisplay}`);
+      } else {
+        translatedElement.removeAttribute("style");
+      }
+      
+      // DeepL属性を削除
+      translatedElement.removeAttribute("data-dl-uid");
+      translatedElement.removeAttribute("data-dl-original");
+      translatedElement.removeAttribute("data-dl-translated");
+      translatedElement.removeAttribute("data-dl-source-lang");
+      translatedElement.removeAttribute("data-dl-target-lang");
+      translatedElement.removeAttribute("data-dl-original-text");
+      translatedElement.removeAttribute("data-dl-processing");
+      translatedElement.removeAttribute("data-dl-error");
+      translatedElement.removeAttribute("data-original-display");
+    });
 
-      // 元の表示状態に戻す
-      const originalDisplay = element.getAttribute("data-original-display") || "block";
-      element.style.display = originalDisplay;
-      element.removeAttribute("data-original-display");
-
+    // 2. originalElementsにある隠れた元要素を復元
+    this.translationState.originalElements.forEach((originalText, element) => {
+      // 元要素が非表示になっている場合は表示する
+      const originalDisplay = element.getAttribute("data-original-display");
+      if (originalDisplay !== null) {
+        element.style.display = originalDisplay;
+        element.removeAttribute("data-original-display");
+      }
+      
+      // 元のテキストを復元
+      element.textContent = originalText;
+      
       // DeepL属性を削除
       element.removeAttribute("data-dl-uid");
       element.removeAttribute("data-dl-original");
@@ -1625,6 +1698,8 @@ ${text}`;
       element.removeAttribute("data-dl-original-text");
       element.removeAttribute("data-dl-processing");
       element.removeAttribute("data-dl-error");
+      
+      console.log(`[FullPageTranslator] 元要素を復元: ${element.tagName} "${originalText.substring(0, 30)}..."`);
     });
 
     this.translationState.originalElements.clear();
