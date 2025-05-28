@@ -381,6 +381,12 @@ class ContentScript {
 
     if (!this.fullPageTranslator) {
       this.fullPageTranslator = new NewFullPageTranslator();
+      
+      // DeepL風の遅延翻訳モード（スクロール時に翻訳）
+      this.fullPageTranslator.setTranslationMode(true);
+      
+      // Google翻訳風（全体翻訳）モード
+      // this.fullPageTranslator.setTranslationMode(false);
     }
 
     this.showTranslationBar();
@@ -394,7 +400,15 @@ class ContentScript {
       }
     };
 
-    await this.fullPageTranslator.translatePage(progressCallback);
+    try {
+      await this.fullPageTranslator.translatePage(progressCallback);
+    } catch (error) {
+      console.error("[ContentScript] ページ翻訳エラー:", error);
+      const statusText = this.translationBar!.querySelector(".status-text") as HTMLElement;
+      if (statusText) {
+        statusText.textContent = "翻訳エラーが発生しました";
+      }
+    }
     
     // 翻訳完了後はボタンテキストを更新
     const toggleBtn = this.translationBar!.querySelector(".toggle-btn") as HTMLElement;

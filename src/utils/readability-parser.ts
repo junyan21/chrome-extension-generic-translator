@@ -19,14 +19,20 @@ export class FullPageTranslator {
     elementCache: new Map<string, TextBlock>(), // UID -> TextBlock のキャッシュ
     styleCache: new Map<string, CSSStyleDeclaration>(), // UID -> スタイル情報
     translationCache: new Map<string, string>(), // テキスト -> 翻訳結果のキャッシュ
+    pendingTranslations: new Set<TextBlock>(), // 翻訳待ちのブロック
+    processingElements: new Set<HTMLElement>(), // 翻訳中の要素
   };
 
   private mutationObserver: MutationObserver | null = null;
+  private scrollObserver: IntersectionObserver | null = null;
+  private viewportObserver: IntersectionObserver | null = null; // ビューポート監視用
   private isTranslating: boolean = false;
   private progressCallback?: (progress: number, status: string) => void;
   private uidCounter: number = 0;
   private sourceLang: string = 'auto';
   private targetLang: string = 'ja';
+  private enableLazyTranslation: boolean = true; // 遅延翻訳の有効化フラグ
+  private viewportCheckInterval: number | null = null; // ビューポートチェック用タイマー
 
   // 除外するタグ名
   private readonly excludedTags = new Set([
@@ -108,6 +114,8 @@ export class FullPageTranslator {
 
   constructor() {
     this.setupMutationObserver();
+    this.setupScrollObserver();
+    this.setupViewportObserver();
   }
 
   /**
@@ -137,14 +145,30 @@ export class FullPageTranslator {
 
       this.updateProgress(10, `${textBlocks.length}個のテキストブロックを発見`);
 
-      // 表示領域内のブロックを優先的に翻訳
-      await this.translateVisibleBlocks(textBlocks);
-
-      // 残りのブロックを翻訳
-      await this.translateRemainingBlocks(textBlocks);
-
+      // 翻訳状態を早めにtrueに設定（スクロール監視を有効化するため）
       this.translationState.isTranslated = true;
-      this.updateProgress(100, "翻訳完了");
+
+      if (this.enableLazyTranslation) {
+        // DeepL風: 表示領域内のブロックのみ翻訳し、残りは遅延翻訳
+        const visibleBlocks = this.getVisibleBlocks(textBlocks);
+        console.log(`[FullPageTranslator] 初回翻訳: ${visibleBlocks.length}個の表示ブロック、全体: ${textBlocks.length}個`);
+        
+        // 表示領域のブロックを翻訳
+        if (visibleBlocks.length > 0) {
+          await this.translateBlocksBatch(visibleBlocks);
+        }
+        
+        // 定期的にビューポート内の未翻訳要素をチェック
+        this.startViewportCheck();
+        
+        this.updateProgress(100, `初回翻訳完了（スクロールで追加翻訳）`);
+      } else {
+        // Google翻訳風: 全てのブロックを一度に翻訳
+        await this.translateVisibleBlocks(textBlocks);
+        await this.translateRemainingBlocks(textBlocks);
+        this.updateProgress(100, "翻訳完了");
+      }
+      
       console.log("[FullPageTranslator] 翻訳完了", this.translationState.translatedElements);
     } catch (error) {
       console.error("[FullPageTranslator] 翻訳エラー:", error);
@@ -1005,7 +1029,7 @@ ${text}`;
     
     this.translationState.originalElements.forEach((_, element) => {
       const translatedElement = element.nextElementSibling as HTMLElement;
-      if (translatedElement?.classList.contains("translated-text")) {
+      if (translatedElement?.classList.contains("dl-translated-text")) {
         const originalDisplay = element.getAttribute('data-original-display') || 'block';
         
         if (this.translationState.isTranslated) {
@@ -1225,14 +1249,183 @@ ${text}`;
   }
 
   /**
+   * スクロール監視の設定（廃止予定）
+   */
+  private setupScrollObserver(): void {
+    // 新しいアプローチでは使用しない
+  }
+  
+  /**
+   * ビューポート監視の設定（新しいアプローチ）
+   */
+  private setupViewportObserver(): void {
+    this.viewportObserver = new IntersectionObserver(
+      (entries) => {
+        if (!this.translationState.isTranslated) return;
+        
+        const elementsToCheck: HTMLElement[] = [];
+        
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const element = entry.target as HTMLElement;
+            // 未翻訳の要素のみ追加
+            if (!this.translationState.originalElements.has(element) && 
+                !this.translationState.processingElements.has(element) &&
+                !element.hasAttribute('data-dl-uid')) {
+              elementsToCheck.push(element);
+            }
+          }
+        });
+        
+        // 新しい未翻訳要素がある場合は翻訳
+        if (elementsToCheck.length > 0) {
+          this.checkAndTranslateElements(elementsToCheck);
+        }
+      },
+      {
+        // ビューポートの500px手前から検出
+        rootMargin: '500px',
+        threshold: 0.01
+      }
+    );
+  }
+  
+  /**
+   * ビューポート内の未翻訳要素を定期的にチェック
+   */
+  private startViewportCheck(): void {
+    // 初回チェック
+    setTimeout(() => this.checkViewportForUntranslated(), 1000);
+    
+    // 定期的なチェック（3秒ごと）
+    this.viewportCheckInterval = window.setInterval(() => {
+      if (this.translationState.isTranslated && !this.isTranslating) {
+        this.checkViewportForUntranslated();
+      }
+    }, 3000);
+    
+    // スクロールイベントでもチェック
+    let scrollTimer: number | null = null;
+    window.addEventListener('scroll', () => {
+      if (scrollTimer) clearTimeout(scrollTimer);
+      scrollTimer = window.setTimeout(() => {
+        if (this.translationState.isTranslated && !this.isTranslating) {
+          this.checkViewportForUntranslated();
+        }
+      }, 500);
+    });
+  }
+  
+  /**
+   * ビューポート内の未翻訳要素をチェック
+   */
+  private checkViewportForUntranslated(): void {
+    console.log("[FullPageTranslator] ビューポート内の未翻訳要素をチェック");
+    
+    // 現在のビューポート内の全要素をチェック
+    const textBlocks = this.extractTextBlocks();
+    const visibleBlocks = this.getVisibleBlocks(textBlocks);
+    
+    // 未翻訳のブロックのみフィルタ
+    const untranslatedBlocks = visibleBlocks.filter(block => 
+      !this.translationState.originalElements.has(block.element) &&
+      !this.translationState.processingElements.has(block.element) &&
+      !block.element.hasAttribute('data-dl-uid')
+    );
+    
+    if (untranslatedBlocks.length > 0) {
+      console.log(`[FullPageTranslator] ${untranslatedBlocks.length}個の未翻訳ブロックを発見`);
+      this.translateBlocksBatchAsync(untranslatedBlocks);
+    }
+  }
+  
+  /**
+   * 要素をチェックして翻訳
+   */
+  private checkAndTranslateElements(elements: HTMLElement[]): void {
+    const blocks: TextBlock[] = [];
+    
+    elements.forEach(element => {
+      if (this.shouldTranslateElement(element)) {
+        const text = this.getDirectTextContent(element);
+        if (text.length > 1) {
+          blocks.push({
+            element: element,
+            originalText: text,
+            isTranslated: false,
+            priority: this.calculatePriority(element),
+          });
+        }
+      }
+    });
+    
+    if (blocks.length > 0) {
+      console.log(`[FullPageTranslator] ${blocks.length}個の新しいブロックを翻訳`);
+      this.translateBlocksBatchAsync(blocks);
+    }
+  }
+  
+  /**
+   * 要素を遅延翻訳の監視対象に追加（廃止予定）
+   */
+  private observeElementForLazyTranslation(element: HTMLElement): void {
+    // 新しいアプローチでは使用しない
+  }
+  
+  /**
+   * 非同期バッチ翻訳（スクロール時用）
+   */
+  private async translateBlocksBatchAsync(blocks: TextBlock[]): Promise<void> {
+    // 既に翻訳中の場合はスキップ
+    if (this.isTranslating) {
+      console.log("[FullPageTranslator] 既に翻訳中のためスキップ");
+      return;
+    }
+    
+    // 翻訳中の要素としてマーク
+    blocks.forEach(block => {
+      this.translationState.processingElements.add(block.element);
+    });
+    
+    // バックグラウンドで非同期に翻訳
+    setTimeout(async () => {
+      if (!this.translationState.isTranslated) return;
+      
+      this.isTranslating = true;
+      try {
+        console.log(`[FullPageTranslator] スクロール翻訳開始: ${blocks.length}個`);
+        await this.translateBlocksBatch(blocks);
+        console.log(`[FullPageTranslator] スクロール翻訳完了: ${blocks.length}個`);
+      } catch (error) {
+        console.error("[FullPageTranslator] スクロール翻訳エラー:", error);
+      } finally {
+        // 翻訳中リストから削除
+        blocks.forEach(block => {
+          this.translationState.processingElements.delete(block.element);
+        });
+        this.isTranslating = false;
+      }
+    }, 100);
+  }
+
+  /**
    * 翻訳状態のリセット
    */
   reset(): void {
     console.log("[FullPageTranslator] 翻訳状態をリセット");
     
+    // 監視を停止
+    if (this.viewportCheckInterval) {
+      clearInterval(this.viewportCheckInterval);
+      this.viewportCheckInterval = null;
+    }
+    if (this.viewportObserver) {
+      this.viewportObserver.disconnect();
+    }
+    
     this.translationState.originalElements.forEach((_, element) => {
       const translatedElement = element.nextElementSibling;
-      if (translatedElement?.classList.contains("translated-text")) {
+      if (translatedElement?.classList.contains("dl-translated-text")) {
         translatedElement.remove();
       }
       
@@ -1240,12 +1433,34 @@ ${text}`;
       const originalDisplay = element.getAttribute('data-original-display') || 'block';
       element.style.display = originalDisplay;
       element.removeAttribute('data-original-display');
+      
+      // DeepL属性を削除
+      element.removeAttribute('data-dl-uid');
+      element.removeAttribute('data-dl-original');
+      element.removeAttribute('data-dl-translated');
+      element.removeAttribute('data-dl-source-lang');
+      element.removeAttribute('data-dl-target-lang');
+      element.removeAttribute('data-dl-original-text');
+      element.removeAttribute('data-dl-processing');
+      element.removeAttribute('data-dl-error');
     });
 
     this.translationState.originalElements.clear();
     this.translationState.translatedElements.clear();
+    this.translationState.elementCache.clear();
+    this.translationState.styleCache.clear();
+    this.translationState.pendingTranslations.clear();
+    this.translationState.processingElements.clear();
     this.translationState.isTranslated = false;
     this.isTranslating = false;
+  }
+  
+  /**
+   * 翻訳モードの切り替え（DeepL風/Google翻訳風）
+   */
+  setTranslationMode(lazyMode: boolean): void {
+    this.enableLazyTranslation = lazyMode;
+    console.log(`[FullPageTranslator] 翻訳モード: ${lazyMode ? 'DeepL風（遅延翻訳）' : 'Google翻訳風（全体翻訳）'}`);
   }
 }
 
