@@ -8,7 +8,7 @@
   overflow: hidden;
   z-index: 10001;
   display: none;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 .translator-header {
@@ -56,6 +56,30 @@
   gap: 12px;
 }
 
+.lang-select {
+  padding: 6px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: white;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 120px;
+}
+
+.lang-select:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.lang-select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
 .lang-label {
   font-size: 14px;
   font-weight: 500;
@@ -100,6 +124,8 @@
   line-height: 1.5;
   color: #1e40af;
   min-height: 50px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .loading-spinner {
@@ -118,7 +144,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .actions {
@@ -209,7 +237,8 @@
   gap: 8px;
 }
 
-.toggle-btn, .cancel-btn {
+.toggle-btn,
+.cancel-btn {
   padding: 8px 16px;
   border-radius: 6px;
   font-size: 14px;
@@ -254,4 +283,188 @@
 
 .translation-content::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
+}
+
+/* DeepL風翻訳テキストスタイル */
+.dl-translated-text {
+  /* 基本的に元のスタイルを継承するため、最小限のスタイルのみ */
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* 翻訳中のインジケーター */
+[data-dl-processing="true"] {
+  position: relative;
+  opacity: 0.6;
+}
+
+[data-dl-processing="true"]::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  border: 2px solid #667eea;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: dl-spin 0.8s linear infinite;
+}
+
+@keyframes dl-spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* エラー状態のスタイル */
+[data-dl-error="true"] {
+  border-bottom: 2px dashed #ef4444;
+  position: relative;
+}
+
+[data-dl-error="true"]::after {
+  content: "⚠";
+  position: absolute;
+  right: -20px;
+  top: 0;
+  color: #ef4444;
+  font-size: 14px;
+}
+
+/* 翻訳バーの改善 */
+#translation-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to bottom, #ffffff 0%, #f9fafb 100%);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  padding: 12px 16px;
+  z-index: 9999;
+  transform: translateY(-100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+#translation-bar.show {
+  transform: translateY(0);
+}
+
+/* 選択テキスト翻訳のポップアップ改善 */
+#claude-translator-popup {
+  position: absolute;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  width: 420px;
+  max-height: 500px;
+  overflow: hidden;
+  z-index: 10001;
+  display: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* フローティングボタンの改善 */
+#claude-translator-button {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(8px);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%);
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 640px) {
+  #claude-translator-popup {
+    width: calc(100vw - 32px);
+    max-width: 420px;
+  }
+  
+  .translation-bar-content {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .progress-section {
+    width: 100%;
+  }
+  
+  .progress-bar-container {
+    flex: 1;
+  }
+}
+
+/* ダークモード対応 */
+@media (prefers-color-scheme: dark) {
+  #claude-translator-popup {
+    background: #1f2937;
+    color: #f3f4f6;
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  .translator-header {
+    background: linear-gradient(135deg, #4c1d95 0%, #5b21b6 100%);
+  }
+  
+  .source-text {
+    background: #374151;
+    color: #f3f4f6;
+  }
+  
+  .translated-text {
+    background: #312e81;
+    color: #e0e7ff;
+  }
+  
+  #translation-bar {
+    background: linear-gradient(to bottom, #1f2937 0%, #111827 100%);
+    border-bottom-color: #374151;
+  }
+  
+  .toggle-btn,
+  .copy-btn {
+    background: #374151;
+    color: #f3f4f6;
+  }
+  
+  .toggle-btn:hover,
+  .copy-btn:hover {
+    background: #4b5563;
+  }
+  
+  .lang-select {
+    background: #374151;
+    color: #f3f4f6;
+    border-color: #4b5563;
+  }
+  
+  .lang-select:hover {
+    background: #4b5563;
+    border-color: #6b7280;
+  }
+  
+  .lang-select:focus {
+    border-color: #818cf8;
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.2);
+  }
+}
+
+/* アクセシビリティ向上 */
+.dl-translated-text:focus,
+[data-dl-uid]:focus {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+/* スクリーンリーダー対応 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
