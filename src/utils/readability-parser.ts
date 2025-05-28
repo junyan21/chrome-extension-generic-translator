@@ -539,7 +539,7 @@ export class FullPageTranslator {
   }
 
   /**
-   * レイアウト崩れを防ぐための調整
+   * レイアウト崩れを防ぐための調整（改行対応）
    */
   private adjustLayoutForTranslation(originalElement: HTMLElement, translatedElement: HTMLElement, computedStyle: CSSStyleDeclaration): void {
     // 文字数の差を計算
@@ -547,34 +547,71 @@ export class FullPageTranslator {
     const translatedLength = translatedElement.textContent?.length || 0;
     const lengthRatio = translatedLength / originalLength;
 
-    // 大幅に文字数が増えた場合の処理
-    if (lengthRatio > 1.5) {
+    // 適切な改行処理を設定
+    this.ensureProperTextWrapping(translatedElement, computedStyle);
+
+    // 大幅に文字数が増えた場合の微調整
+    if (lengthRatio > 2.0) {
       // フォントサイズを微調整（最大10%まで）
       const fontSize = parseFloat(computedStyle.fontSize);
-      if (fontSize > 12) { // 12px以上の場合のみ調整
-        const adjustedSize = Math.max(fontSize * 0.9, 12);
+      if (fontSize > 14) { // 14px以上の場合のみ調整
+        const adjustedSize = Math.max(fontSize * 0.95, 14);
         translatedElement.style.fontSize = `${adjustedSize}px`;
-      }
-
-      // 行の高さも調整
-      const lineHeight = computedStyle.lineHeight;
-      if (lineHeight !== 'normal') {
-        const lineHeightValue = parseFloat(lineHeight);
-        if (!isNaN(lineHeightValue)) {
-          translatedElement.style.lineHeight = `${lineHeightValue * 0.95}`;
-        }
       }
     }
 
-    // 固定幅要素の場合の処理
-    if (computedStyle.width !== 'auto' && !computedStyle.width.includes('%')) {
-      translatedElement.style.overflow = 'hidden';
-      translatedElement.style.textOverflow = 'ellipsis';
-      translatedElement.style.whiteSpace = 'nowrap';
+    // 非常に狭いコンテナの場合のみ特別処理
+    this.handleNarrowContainers(originalElement, translatedElement, computedStyle, lengthRatio);
+  }
+  
+  /**
+   * 適切なテキスト改行を確保
+   */
+  private ensureProperTextWrapping(element: HTMLElement, computedStyle: CSSStyleDeclaration): void {
+    // デフォルトで適切な改行を許可
+    element.style.whiteSpace = 'normal';
+    element.style.wordWrap = 'break-word';
+    element.style.overflowWrap = 'break-word';
+    element.style.wordBreak = 'normal';
+    
+    // 日本語の場合は、より柔軟な改行を許可
+    const text = element.textContent || '';
+    const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text);
+    if (hasJapanese) {
+      element.style.wordBreak = 'break-all';
+      element.style.lineBreak = 'anywhere';
+    }
+    
+    // overflowの適切な処理
+    if (computedStyle.overflow === 'hidden') {
+      element.style.overflow = 'visible';
+    }
+  }
+  
+  /**
+   * 狭いコンテナの処理
+   */
+  private handleNarrowContainers(originalElement: HTMLElement, translatedElement: HTMLElement, computedStyle: CSSStyleDeclaration, lengthRatio: number): void {
+    const elementWidth = originalElement.getBoundingClientRect().width;
+    const isVeryNarrow = elementWidth < 100; // 100px未満を狭いと判定
+    const isFixedWidth = computedStyle.width !== 'auto' && !computedStyle.width.includes('%');
+    
+    // 非常に狭いかつ文字数が大幅に増えた場合のみ特別処理
+    if (isVeryNarrow && isFixedWidth && lengthRatio > 4.0) {
+      console.log(`[FullPageTranslator] 狭いコンテナで文字数が大幅増加: ${lengthRatio.toFixed(2)}倍, 幅: ${elementWidth}px`);
       
-      // ツールチップで全文を表示
-      if (lengthRatio > 1.2) {
-        translatedElement.title = translatedElement.textContent || '';
+      // 最後の手段としてツールチップを追加
+      translatedElement.title = `全文: ${translatedElement.textContent || ''}`;
+      
+      // 狭いコンテナ用のスタイル調整
+      translatedElement.style.fontSize = '0.9em';
+      translatedElement.style.lineHeight = '1.2';
+      
+      // 最大高さを設定してスクロールを許可
+      const maxHeight = originalElement.getBoundingClientRect().height * 3;
+      if (maxHeight > 0) {
+        translatedElement.style.setProperty('max-height', `${maxHeight}px`, 'important');
+        translatedElement.style.setProperty('overflow-y', 'auto', 'important');
       }
     }
   }

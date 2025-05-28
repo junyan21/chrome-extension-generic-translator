@@ -124,8 +124,11 @@
   line-height: 1.5;
   color: #1e40af;
   min-height: 50px;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  text-overflow: clip !important;
 }
 
 .loading-spinner {
@@ -289,6 +292,24 @@
 .dl-translated-text {
   /* 基本的に元のスタイルを継承するため、最小限のスタイルのみ */
   transition: opacity 0.2s ease-in-out;
+  
+  /* 翻訳テキストの適切な改行を強制 */
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  word-break: normal !important;
+  text-overflow: clip !important;
+  
+  /* 日本語用の適切な改行 */
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  -moz-hyphens: auto;
+}
+
+/* 日本語テキストの場合はより柔軟な改行 */
+.dl-translated-text:lang(ja) {
+  word-break: break-all !important;
+  line-break: anywhere;
 }
 
 /* 翻訳中のインジケーター */
@@ -454,6 +475,26 @@
 [data-dl-uid]:focus {
   outline: 2px solid #667eea;
   outline-offset: 2px;
+}
+
+/* 特定のサイトでのテキスト切り詰めを強制的に上書き */
+.dl-translated-text * {
+  white-space: normal !important;
+  text-overflow: clip !important;
+  overflow: visible !important;
+}
+
+/* 特に問題の多いスタイルを強制的に上書き */
+.dl-translated-text[style*="white-space"] {
+  white-space: normal !important;
+}
+
+.dl-translated-text[style*="text-overflow"] {
+  text-overflow: clip !important;
+}
+
+.dl-translated-text[style*="overflow: hidden"] {
+  overflow: visible !important;
 }
 
 /* スクリーンリーダー対応 */
