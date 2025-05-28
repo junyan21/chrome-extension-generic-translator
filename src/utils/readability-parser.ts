@@ -404,6 +404,12 @@ export class FullPageTranslator {
     const computedStyle = window.getComputedStyle(block.element);
     this.translationState.styleCache.set(block.uid, computedStyle);
 
+    // 翻訳時点で要素が非表示の場合はスキップ
+    if (computedStyle.display === "none" || !this.isElementVisible(block.element)) {
+      console.log(`[FullPageTranslator] 要素が非表示のため翻訳をスキップ: ${block.element.tagName} - "${block.originalText.substring(0, 50)}..."`);
+      return;
+    }
+
     // DeepL風の属性を設定
     this.markElementWithDeepLAttributes(block.element, {
       uid: block.uid,
@@ -1169,23 +1175,52 @@ ${text}`;
       } に切り替え`
     );
 
-    this.translationState.originalElements.forEach((_, element) => {
+    let toggledCount = 0;
+    this.translationState.originalElements.forEach((originalText, element) => {
       const translatedElement = element.nextElementSibling as HTMLElement;
       if (translatedElement?.classList.contains("dl-translated-text")) {
-        const originalDisplay = element.getAttribute("data-original-display") || "block";
+        const originalDisplay = element.getAttribute("data-original-display") || "";
+        
+        console.log(`[FullPageTranslator] 要素切り替え:`, {
+          elementTagName: element.tagName,
+          originalText: originalText.substring(0, 50) + "...",
+          originalDisplay: originalDisplay,
+          currentElementDisplay: element.style.display,
+          currentTranslatedDisplay: translatedElement.style.display,
+          isTranslated: this.translationState.isTranslated
+        });
 
         if (this.translationState.isTranslated) {
           // 翻訳文→原文に切り替え
-          element.style.display = originalDisplay;
+          // originalDisplayが'none'の場合は、要素タイプに応じたデフォルト値を使用
+          let displayValue = originalDisplay;
+          if (originalDisplay === "none" || originalDisplay === "") {
+            // 要素タイプに応じたデフォルト表示値を設定
+            const tagName = element.tagName.toLowerCase();
+            if (["div", "p", "h1", "h2", "h3", "h4", "h5", "h6", "section", "article", "header", "footer"].includes(tagName)) {
+              displayValue = "block";
+            } else if (["span", "a", "strong", "em", "code"].includes(tagName)) {
+              displayValue = "inline";
+            } else {
+              displayValue = ""; // ブラウザのデフォルトに任せる
+            }
+          }
+          element.style.display = displayValue;
+          element.style.visibility = "";
+          element.style.opacity = "";
           translatedElement.style.display = "none";
+          console.log(`[FullPageTranslator] 原文表示: ${element.tagName} display="${displayValue}" (original: "${originalDisplay}")`);
         } else {
           // 原文→翻訳文に切り替え
           element.style.display = "none";
-          translatedElement.style.display = originalDisplay;
+          translatedElement.style.display = originalDisplay === "none" ? "" : (originalDisplay || "");
+          console.log(`[FullPageTranslator] 翻訳表示: ${element.tagName}`);
         }
+        toggledCount++;
       }
     });
 
+    console.log(`[FullPageTranslator] 切り替え完了: ${toggledCount}個の要素を処理`);
     this.translationState.isTranslated = !this.translationState.isTranslated;
   }
 
