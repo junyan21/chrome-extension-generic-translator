@@ -1,13 +1,13 @@
 export interface TranslationRequest {
   text: string;
-  sourceLang: 'ja' | 'en' | 'zh' | 'ko' | 'auto';
-  targetLang: 'ja' | 'en' | 'zh' | 'ko';
+  sourceLang: "ja" | "en" | "zh" | "ko" | "auto";
+  targetLang: "ja" | "en" | "zh" | "ko";
   context?: string;
 }
 
 export interface TranslationResponse {
   translatedText: string;
-  detectedLanguage?: 'ja' | 'en' | 'zh' | 'ko';
+  detectedLanguage?: "ja" | "en" | "zh" | "ko";
 }
 
 export class ClaudeTranslator {
@@ -27,17 +27,21 @@ export class ClaudeTranslator {
     try {
       const prompt = this.buildOptimizedPrompt(request);
       const translatedText = await this.callClaudeAPI(prompt);
-      
+
       this.addToCache(cacheKey, translatedText);
-      
+
       return { translatedText };
     } catch (error) {
-      console.error('Translation error:', error);
-      throw new Error('翻訳に失敗しました');
+      console.error("Translation error:", error);
+      throw new Error("翻訳に失敗しました");
     }
   }
 
-  async batchTranslate(texts: string[], sourceLang: 'ja' | 'en' | 'zh' | 'ko' | 'auto', targetLang: 'ja' | 'en' | 'zh' | 'ko'): Promise<string[]> {
+  async batchTranslate(
+    texts: string[],
+    sourceLang: "ja" | "en" | "zh" | "ko" | "auto",
+    targetLang: "ja" | "en" | "zh" | "ko"
+  ): Promise<string[]> {
     const maxTokensPerBatch = 3000;
     const batches: string[][] = [];
     let currentBatch: string[] = [];
@@ -54,7 +58,7 @@ export class ClaudeTranslator {
         currentTokenCount += estimatedTokens;
       }
     }
-    
+
     if (currentBatch.length > 0) {
       batches.push(currentBatch);
     }
@@ -68,11 +72,15 @@ export class ClaudeTranslator {
     return results;
   }
 
-  private async translateBatch(texts: string[], sourceLang: 'ja' | 'en' | 'zh' | 'ko' | 'auto', targetLang: 'ja' | 'en' | 'zh' | 'ko'): Promise<string[]> {
-    const numberedTexts = texts.map((text, i) => `[${i + 1}] ${text}`).join('\n\n');
+  private async translateBatch(
+    texts: string[],
+    sourceLang: "ja" | "en" | "zh" | "ko" | "auto",
+    targetLang: "ja" | "en" | "zh" | "ko"
+  ): Promise<string[]> {
+    const numberedTexts = texts.map((text, i) => `[${i + 1}] ${text}`).join("\n\n");
     const prompt = `You are a professional Japanese-English translator. Translate the following numbered texts while preserving their meaning, tone, and formatting.
 
-Source language: ${sourceLang === 'auto' ? 'Detect automatically' : sourceLang}
+Source language: ${sourceLang === "auto" ? "Detect automatically" : sourceLang}
 Target language: ${targetLang}
 
 Rules:
@@ -86,13 +94,14 @@ Texts to translate:
 ${numberedTexts}`;
 
     const response = await this.callClaudeAPI(prompt);
-    
-    const translations = response.split('\n')
-      .filter(line => line.trim().match(/^\[\d+\]/))
-      .map(line => line.replace(/^\[\d+\]\s*/, ''));
+
+    const translations = response
+      .split("\n")
+      .filter((line) => line.trim().match(/^\[\d+\]/))
+      .map((line) => line.replace(/^\[\d+\]\s*/, ""));
 
     if (translations.length !== texts.length) {
-      throw new Error('Batch translation count mismatch');
+      throw new Error("Batch translation count mismatch");
     }
 
     return translations;
@@ -101,9 +110,9 @@ ${numberedTexts}`;
   private buildOptimizedPrompt(request: TranslationRequest): string {
     return `You are a professional Japanese-English translator. Translate the following text while preserving its meaning, tone, and formatting.
 
-Source language: ${request.sourceLang === 'auto' ? 'Detect automatically' : request.sourceLang}
+Source language: ${request.sourceLang === "auto" ? "Detect automatically" : request.sourceLang}
 Target language: ${request.targetLang}
-${request.context ? `Context: ${request.context}` : ''}
+${request.context ? `Context: ${request.context}` : ""}
 
 Rules:
 - Maintain natural fluency in the target language
@@ -119,27 +128,30 @@ ${request.text}`;
     // Send message to background script to make API call
     return new Promise((resolve, reject) => {
       try {
-        chrome.runtime.sendMessage({
-          action: 'translate',
-          prompt: prompt
-        }, (response) => {
-          if (chrome.runtime.lastError) {
-            // Check for extension context invalidated error
-            if (chrome.runtime.lastError.message?.includes('Extension context invalidated')) {
-              reject(new Error('拡張機能が更新されました。ページを再読み込みしてください。'));
+        chrome.runtime.sendMessage(
+          {
+            action: "translate",
+            prompt: prompt,
+          },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              // Check for extension context invalidated error
+              if (chrome.runtime.lastError.message?.includes("Extension context invalidated")) {
+                reject(new Error("拡張機能が更新されました。ページを再読み込みしてください。"));
+              } else {
+                reject(new Error(chrome.runtime.lastError.message));
+              }
+            } else if (!response) {
+              reject(new Error("拡張機能との通信に失敗しました。ページを再読み込みしてください。"));
+            } else if (response.error) {
+              reject(new Error(response.error));
             } else {
-              reject(new Error(chrome.runtime.lastError.message));
+              resolve(response.translatedText);
             }
-          } else if (!response) {
-            reject(new Error('拡張機能との通信に失敗しました。ページを再読み込みしてください。'));
-          } else if (response.error) {
-            reject(new Error(response.error));
-          } else {
-            resolve(response.translatedText);
           }
-        });
+        );
       } catch (error) {
-        reject(new Error('拡張機能との通信に失敗しました。ページを再読み込みしてください。'));
+        reject(new Error("拡張機能との通信に失敗しました。ページを再読み込みしてください。"));
       }
     });
   }
@@ -151,7 +163,9 @@ ${request.text}`;
   private addToCache(key: string, value: string) {
     if (this.cache.size >= this.maxCacheSize) {
       const firstKey = this.cache.keys().next().value;
-      this.cache.delete(firstKey);
+      if (firstKey !== undefined) {
+        this.cache.delete(firstKey);
+      }
     }
     this.cache.set(key, value);
   }
