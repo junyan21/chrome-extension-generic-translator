@@ -19,7 +19,6 @@ build/
 .vscode/
 *.sublime-project
 *.sublime-workspace
-CLAUDE.md
 
 # Environment variables
 .env
