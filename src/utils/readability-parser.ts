@@ -147,13 +147,11 @@ export class FullPageTranslator {
     progressCallback?: (progress: number, status: string) => void
   ): Promise<void> {
     if (this.isTranslating) {
-      console.log("[FullPageTranslator] 翻訳処理中のため中止");
       return;
     }
 
     this.isTranslating = true;
     this.progressCallback = progressCallback;
-    console.log("[FullPageTranslator] ページ翻訳を開始");
 
     try {
       this.updateProgress(0, "テキストブロックを抽出中...");
@@ -162,7 +160,6 @@ export class FullPageTranslator {
       const textBlocks = this.extractTextBlocks();
 
       if (textBlocks.length === 0) {
-        console.log("[FullPageTranslator] 翻訳対象のテキストが見つかりません");
         this.updateProgress(100, "翻訳対象が見つかりませんでした");
         return;
       }
@@ -175,9 +172,6 @@ export class FullPageTranslator {
       if (this.enableLazyTranslation) {
         // DeepL風: 表示領域内のブロックのみ翻訳し、残りは遅延翻訳
         const visibleBlocks = this.getVisibleBlocks(textBlocks);
-        console.log(
-          `[FullPageTranslator] 初回翻訳: ${visibleBlocks.length}個の表示ブロック、全体: ${textBlocks.length}個`
-        );
 
         // 表示領域のブロックを翻訳
         if (visibleBlocks.length > 0) {
@@ -195,7 +189,6 @@ export class FullPageTranslator {
         this.updateProgress(100, "翻訳完了");
       }
 
-      console.log("[FullPageTranslator] 翻訳完了", this.translationState.translatedElements);
     } catch (error) {
       console.error("[FullPageTranslator] 翻訳エラー:", error);
       this.updateProgress(0, "翻訳エラーが発生しました");
@@ -208,7 +201,6 @@ export class FullPageTranslator {
    * テキストブロックの抽出（可視要素のみ）
    */
   private extractTextBlocks(): TextBlock[] {
-    console.log("[FullPageTranslator] テキストブロックの抽出を開始...");
 
     const blocks: TextBlock[] = [];
 
@@ -218,7 +210,6 @@ export class FullPageTranslator {
       const contentElement = document.querySelector(selector);
       if (contentElement) {
         contentRoot = contentElement;
-        console.log(`[FullPageTranslator] メインコンテンツ領域を発見: ${selector}`);
         break;
       }
     }
@@ -247,10 +238,7 @@ export class FullPageTranslator {
           const computedStyle = window.getComputedStyle(htmlElement);
           const isCurrentlyVisible = this.isElementVisible(htmlElement);
           
-          console.log(`[FullPageTranslator] 翻訳対象候補: ${htmlElement.tagName} display="${computedStyle.display}" visible=${isCurrentlyVisible} text="${text.substring(0, 30)}..."`);
-          
           if (computedStyle.display === "none" || !isCurrentlyVisible) {
-            console.log(`[FullPageTranslator] 非表示のため除外: ${htmlElement.tagName}`);
             hiddenCount++;
           } else {
             // 1文字以上のテキストのみ
@@ -290,9 +278,6 @@ export class FullPageTranslator {
       }
     }
 
-    console.log(
-      `[FullPageTranslator] ${blocks.length}個の可視テキストブロックを抽出（${hiddenCount}個の非表示、${excludedCount}個の除外要素をスキップ）`
-    );
     return blocks.sort((a, b) => b.priority - a.priority);
   }
 
@@ -314,7 +299,6 @@ export class FullPageTranslator {
    */
   private async translateVisibleBlocks(blocks: TextBlock[]): Promise<void> {
     const visibleBlocks = this.getVisibleBlocks(blocks).filter((block) => !block.isTranslated);
-    console.log(`[FullPageTranslator] ${visibleBlocks.length}個の表示ブロックを翻訳`);
 
     if (visibleBlocks.length === 0) {
       return;
@@ -332,7 +316,6 @@ export class FullPageTranslator {
    */
   private async translateRemainingBlocks(blocks: TextBlock[]): Promise<void> {
     const remainingBlocks = blocks.filter((block) => !block.isTranslated);
-    console.log(`[FullPageTranslator] ${remainingBlocks.length}個の残りブロックを翻訳`);
 
     if (remainingBlocks.length === 0) {
       return;
@@ -417,11 +400,6 @@ export class FullPageTranslator {
 
     // 翻訳時点で要素が非表示の場合はスキップ
     if (computedStyle.display === "none" || !this.isElementVisible(block.element)) {
-      console.log(
-        `[FullPageTranslator] 要素が非表示のため翻訳をスキップ: ${
-          block.element.tagName
-        } - "${block.originalText.substring(0, 50)}..."`
-      );
       return;
     }
 
@@ -699,11 +677,6 @@ export class FullPageTranslator {
 
     // 非常に狭いかつ文字数が大幅に増えた場合のみ特別処理
     if (isVeryNarrow && isFixedWidth && lengthRatio > 4.0) {
-      console.log(
-        `[FullPageTranslator] 狭いコンテナで文字数が大幅増加: ${lengthRatio.toFixed(
-          2
-        )}倍, 幅: ${elementWidth}px`
-      );
 
       // 最後の手段としてツールチップを追加
       translatedElement.title = `全文: ${translatedElement.textContent || ""}`;
@@ -940,15 +913,8 @@ export class FullPageTranslator {
 
       // 全てキャッシュにある場合は即座に返す
       if (textsToTranslate.length === 0) {
-        console.log(`[FullPageTranslator] 全て（${texts.length}個）キャッシュから取得`);
         return results;
       }
-
-      console.log(
-        `[FullPageTranslator] ${textsToTranslate.length}個を翻訳、${
-          results.filter((r) => r).length
-        }個はキャッシュから取得`
-      );
 
       // Chrome Extension API経由でバッチ翻訳を実行
       const translatedTexts = await new Promise<string[]>((resolve, reject) => {
@@ -1167,9 +1133,6 @@ ${text}`;
       batches.push(currentBatch);
     }
 
-    console.log(
-      `[FullPageTranslator] ${blocks.length}個のブロックを${batches.length}個のバッチに分割`
-    );
     return batches;
   }
 
@@ -1184,11 +1147,6 @@ ${text}`;
    * 翻訳の切り替え（Google翻訳スタイル）
    */
   toggleTranslation(): void {
-    console.log(
-      `[FullPageTranslator] 翻訳切り替え: ${
-        this.translationState.isTranslated ? "原文" : "翻訳"
-      } に切り替え`
-    );
 
     let toggledCount = 0;
     this.translationState.originalElements.forEach((originalText, element) => {
@@ -1196,14 +1154,6 @@ ${text}`;
       if (translatedElement?.classList.contains("dl-translated-text")) {
         const originalDisplay = element.getAttribute("data-original-display") || "";
 
-        console.log(`[FullPageTranslator] 要素切り替え:`, {
-          elementTagName: element.tagName,
-          originalText: originalText.substring(0, 50) + "...",
-          originalDisplay: originalDisplay,
-          currentElementDisplay: element.style.display,
-          currentTranslatedDisplay: translatedElement.style.display,
-          isTranslated: this.translationState.isTranslated,
-        });
 
         if (this.translationState.isTranslated) {
           // 翻訳文→原文に切り替え
@@ -1239,20 +1189,15 @@ ${text}`;
           element.style.visibility = "";
           element.style.opacity = "";
           translatedElement.style.display = "none";
-          console.log(
-            `[FullPageTranslator] 原文表示: ${element.tagName} display="${displayValue}" (original: "${originalDisplay}")`
-          );
         } else {
           // 原文→翻訳文に切り替え
           element.style.display = "none";
           translatedElement.style.display = originalDisplay === "none" ? "" : originalDisplay || "";
-          console.log(`[FullPageTranslator] 翻訳表示: ${element.tagName}`);
         }
         toggledCount++;
       }
     });
 
-    console.log(`[FullPageTranslator] 切り替え完了: ${toggledCount}個の要素を処理`);
     this.translationState.isTranslated = !this.translationState.isTranslated;
   }
 
@@ -1400,7 +1345,6 @@ ${text}`;
     });
 
     if (newBlocks.length > 0) {
-      console.log(`[FullPageTranslator] ${newBlocks.length}個の新しいブロックを翻訳`);
 
       // 翻訳中フラグを立てる
       this.isTranslating = true;
@@ -1533,7 +1477,6 @@ ${text}`;
    * ビューポート内の未翻訳要素をチェック
    */
   private checkViewportForUntranslated(): void {
-    console.log("[FullPageTranslator] ビューポート内の未翻訳要素をチェック");
 
     // 現在のビューポート内の全要素をチェック
     const textBlocks = this.extractTextBlocks();
@@ -1548,7 +1491,6 @@ ${text}`;
     );
 
     if (untranslatedBlocks.length > 0) {
-      console.log(`[FullPageTranslator] ${untranslatedBlocks.length}個の未翻訳ブロックを発見`);
       this.translateBlocksBatchAsync(untranslatedBlocks);
     }
   }
@@ -1574,7 +1516,6 @@ ${text}`;
     });
 
     if (blocks.length > 0) {
-      console.log(`[FullPageTranslator] ${blocks.length}個の新しいブロックを翻訳`);
       this.translateBlocksBatchAsync(blocks);
     }
   }
@@ -1592,7 +1533,6 @@ ${text}`;
   private async translateBlocksBatchAsync(blocks: TextBlock[]): Promise<void> {
     // 既に翻訳中の場合はスキップ
     if (this.isTranslating) {
-      console.log("[FullPageTranslator] 既に翻訳中のためスキップ");
       return;
     }
 
@@ -1607,9 +1547,7 @@ ${text}`;
 
       this.isTranslating = true;
       try {
-        console.log(`[FullPageTranslator] スクロール翻訳開始: ${blocks.length}個`);
         await this.translateBlocksBatch(blocks);
-        console.log(`[FullPageTranslator] スクロール翻訳完了: ${blocks.length}個`);
       } catch (error) {
         console.error("[FullPageTranslator] スクロール翻訳エラー:", error);
       } finally {
@@ -1626,7 +1564,6 @@ ${text}`;
    * 翻訳状態のリセット
    */
   reset(): void {
-    console.log("[FullPageTranslator] 翻訳状態をリセット");
 
     // 監視を停止
     if (this.viewportCheckInterval) {
@@ -1639,7 +1576,6 @@ ${text}`;
 
     // 1. まず、DOM上の全ての翻訳要素を検索して削除
     const allTranslatedElements = document.querySelectorAll(".dl-translated-text");
-    console.log(`[FullPageTranslator] ${allTranslatedElements.length}個の翻訳要素を削除`);
     
     allTranslatedElements.forEach((translatedElement) => {
       // 翻訳要素から元のテキストを復元
@@ -1648,7 +1584,6 @@ ${text}`;
         try {
           const decodedText = atob(originalText);
           translatedElement.textContent = decodedText;
-          console.log(`[FullPageTranslator] 元のテキストを復元: "${decodedText.substring(0, 30)}..."`);
         } catch (error) {
           console.error("[FullPageTranslator] テキストの復元に失敗:", error);
         }
@@ -1698,8 +1633,6 @@ ${text}`;
       element.removeAttribute("data-dl-original-text");
       element.removeAttribute("data-dl-processing");
       element.removeAttribute("data-dl-error");
-      
-      console.log(`[FullPageTranslator] 元要素を復元: ${element.tagName} "${originalText.substring(0, 30)}..."`);
     });
 
     this.translationState.originalElements.clear();
@@ -1717,11 +1650,6 @@ ${text}`;
    */
   setTranslationMode(lazyMode: boolean): void {
     this.enableLazyTranslation = lazyMode;
-    console.log(
-      `[FullPageTranslator] 翻訳モード: ${
-        lazyMode ? "DeepL風（遅延翻訳）" : "Google翻訳風（全体翻訳）"
-      }`
-    );
   }
 }
 

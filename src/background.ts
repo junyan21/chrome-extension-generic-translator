@@ -40,8 +40,6 @@ chrome.commands.onCommand.addListener((command, tab) => {
 
 // Handle API calls from content scripts
 async function callClaudeAPI(prompt: string, apiKey: string) {
-  console.log('Background: Making API call with prompt length:', prompt.length);
-  
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -63,8 +61,6 @@ async function callClaudeAPI(prompt: string, apiKey: string) {
       })
     });
 
-    console.log('Background: API response status:', response.status);
-
     if (!response.ok) {
       const error = await response.json();
       console.error('Background: API error:', error);
@@ -72,7 +68,6 @@ async function callClaudeAPI(prompt: string, apiKey: string) {
     }
 
     const data = await response.json();
-    console.log('Background: API response received');
     return data.content[0].text;
   } catch (error) {
     console.error('Background: API call failed:', error);
@@ -91,12 +86,10 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   
   // Handle translation API calls
   if (request.action === 'translate') {
-    console.log('Background: Received translation request, prompt length:', request.prompt?.length);
     (async () => {
       try {
         // Get API key from storage
         const result = await chrome.storage.sync.get(['apiKey']);
-        console.log('Background: API key exists:', !!result.apiKey);
         
         if (!result.apiKey) {
           console.error('Background: API key not found in storage');
@@ -104,9 +97,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
           return;
         }
         
-        console.log('Background: Making API call...');
         const translatedText = await callClaudeAPI(request.prompt, result.apiKey);
-        console.log('Background: API call successful, response length:', translatedText?.length);
         sendResponse({ success: true, translatedText });
       } catch (error) {
         console.error('Background: Translation error:', error);
@@ -132,7 +123,6 @@ chrome.action.onClicked.addListener((tab) => {
 // Handle extension updates
 chrome.runtime.onUpdateAvailable.addListener(() => {
   // Optionally reload the extension when an update is available
-  console.log('Extension update available');
 });
 
 // Export for TypeScript
