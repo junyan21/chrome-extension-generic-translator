@@ -251,12 +251,8 @@ class ContentScript {
     loadingSpinner.style.display = "block";
 
     try {
-      console.log("[ContentScript] 選択テキスト翻訳開始:", this.selectedText);
-      
       const detectedLang = this.languageDetector.detect(this.selectedText);
       const targetLang = this.languageDetector.getTargetLanguage(this.selectedText);
-      
-      console.log("[ContentScript] 言語検出結果:", { detectedLang, targetLang });
 
       this.updateLanguageLabels(detectedLang, targetLang);
 
@@ -268,15 +264,12 @@ class ContentScript {
         finalTargetLang = "ja"; // 中国語・韓国語は日本語に翻訳
       }
 
-      console.log("[ContentScript] 翻訳開始:", { sourceLang: "auto", targetLang: finalTargetLang });
-
       const result = await this.translator.translate({
         text: this.selectedText,
         sourceLang: "auto",
         targetLang: finalTargetLang,
       });
-
-      console.log("[ContentScript] 翻訳完了:", result.translatedText);
+      
       if (translatedText) {
         translatedText.textContent = result.translatedText;
       }
